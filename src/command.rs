@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use std::str::SplitWhitespace;
+use crate::builtin::Builtin;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Command<'a> {
@@ -34,46 +34,68 @@ impl<'a> From<&'a str> for Command<'a> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub enum Builtin {
-    Exit,
-    Echo,
-    Type,
-}
 
 
-impl Builtin {
-    pub fn run(&self, mut args: SplitWhitespace) {
-        match self {
-            Self::Exit => {
-                std::process::exit(args.next().map_or(0, |code| {
-                    code.parse().expect("could not parse exit code to i32")
-                }))
-            }
-            Self::Echo => {
-                println!("{}", args.collect::<Vec<_>>().join(" "))
-            }
-            Self::Type => {
-                let command = args.next().expect("missing arg");
-                match Command::from(command) {
-                    Command::Builtin(_) => println!("{command} is a shell builtin"),
-                    Command::Executable(path) => println!("{command} is {path}", path = path.to_string_lossy()),
-                    Command::NotFound(_) => println!("{command}: not found"),
-                }
-            }
-        }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{env, fs};
+    use tempfile::tempdir;
+
+    #[test]
+    fn command_returns_correct_builtins() {
+        let command = Command::from("exit");
+        assert_eq!(command, Command::Builtin(Builtin::Exit));
+
+        let command = Command::from("echo");
+        assert_eq!(command, Command::Builtin(Builtin::Echo));
+
+        let command = Command::from("type");
+        assert_eq!(command, Command::Builtin(Builtin::Type));
     }
-}
 
-impl TryFrom<&str> for Builtin {
-    type Error = ();
+    #[test]
+    fn command_returns_executable_if_on_path() {
+        // Create a temporary directory
+        let dir = tempdir().unwrap();
+        let dir_path = dir.path();
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        match value {
-            "exit" => Ok(Builtin::Exit),
-            "echo" => Ok(Builtin::Echo),
-            "type" => Ok(Builtin::Type),
-            _ => Err(())
+        // Create a temporary executable file
+        let executable_path = dir_path.join("test_executable");
+        fs::write(&executable_path, "#!/bin/sh\necho Hello").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&executable_path, fs::Permissions::from_mode(0o755)).unwrap();
         }
+
+        // Add the temporary directory to the PATH
+        env::set_var("PATH", dir_path);
+
+        // Test the Command::from function
+        let command = Command::from("test_executable");
+
+        // Check the result
+        assert_eq!(command, Command::Executable(executable_path));
     }
+
+    #[test]
+    fn command_returns_not_found_when_executable_not_found() {
+        // Save the current PATH
+        let old_path = env::var("PATH").unwrap();
+
+        // Set a new empty PATH
+        env::set_var("PATH", "");
+
+        // Test the Command::from function
+        let command = Command::from("nonexistent_executable");
+
+        // Restore the original PATH
+        env::set_var("PATH", old_path);
+
+        // Check the result
+        assert_eq!(command, Command::NotFound("nonexistent_executable"));
+    }
+
+
 }
