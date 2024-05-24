@@ -5,7 +5,7 @@ fn main() {
     // You can use print statements as follows for debugging, they'll be visible when running tests.
     // println!("Logs from your program will appear here!");
 
-    
+
     loop {
         print!("$ ");
         io::stdout().flush().unwrap();
@@ -16,6 +16,14 @@ fn main() {
         stdin.read_line(&mut input).unwrap();
         // Get command
         let command = input.trim();
-        println!("{command}: command not found");
+        if command.starts_with("exit") {
+            match command.split_once(' ') {
+                None => std::process::exit(0),
+                Some((_, arg)) => std::process::exit(arg.parse().unwrap())
+            }
+        }
+        match command {
+            command => println!("{command}: command not found")
+        }
     }
 }
