@@ -4,7 +4,7 @@ use std::str::SplitWhitespace;
 #[derive(Debug, PartialEq, Eq)]
 pub enum Command<'a> {
     Builtin(Builtin),
-    Executable(String),
+    Executable(PathBuf),
     NotFound(&'a str),
 }
 
@@ -27,7 +27,7 @@ impl<'a> From<&'a str> for Command<'a> {
                 }
             })
         {
-            return Self::Executable(executable.to_string_lossy().to_string());
+            return Self::Executable(executable);
         }
 
         Self::NotFound(value)
@@ -57,7 +57,7 @@ impl Builtin {
                 let command = args.next().expect("missing arg");
                 match Command::from(command) {
                     Command::Builtin(_) => println!("{command} is a shell builtin"),
-                    Command::Executable(path) => println!("{command} is {path}"),
+                    Command::Executable(path) => println!("{command} is {path}", path = path.to_string_lossy()),
                     Command::NotFound(_) => println!("{command}: not found"),
                 }
             }

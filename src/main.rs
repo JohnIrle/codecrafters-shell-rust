@@ -14,13 +14,18 @@ fn main() {
         let stdin = io::stdin();
         let mut input = String::new();
         stdin.read_line(&mut input).unwrap();
-        // Get command
+        // Get command and args
         let mut parts = input.split_whitespace();
         let command = parts.next().expect("No command");
         
         match Command::from(command) {
             Command::Builtin(builtin_command) => builtin_command.run(parts),
-            Command::Executable(_) => unimplemented!(),
+            Command::Executable(path    ) => {
+               std::process::Command::new(path)
+                   .args(parts)
+                   .status()
+                   .expect("could not execute command");
+            },
             Command::NotFound(command) => println!("{command}: command not found"), 
         }
     }
